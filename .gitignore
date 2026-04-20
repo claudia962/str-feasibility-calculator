@@ -15,3 +15,5 @@ node_modules/
 .DS_Store
 
 .vercel
+data/melbourne_listings.csv
+data/melbourne_listings.csv.gz
