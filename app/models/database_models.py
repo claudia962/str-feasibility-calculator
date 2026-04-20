@@ -2,14 +2,17 @@
 import uuid
 from decimal import Decimal
 from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.types import TypeDecorator, TEXT
+import json as _json
+from sqlalchemy import Uuid
 from sqlalchemy.orm import relationship
 from app.database import Base
 
 
 class Property(Base):
     __tablename__ = "properties"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(500), nullable=False)
     address = Column(Text)
     latitude = Column(Numeric(10, 7))
@@ -19,13 +22,13 @@ class Property(Base):
     property_type = Column(String(50))
     purchase_price = Column(Numeric(14, 2))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    metadata_ = Column("metadata", JSONB, default=dict)
+    metadata_ = Column("metadata", JSON, default=dict)
     feasibility_analyses = relationship("FeasibilityAnalysis", back_populates="property")
 
 
 class Event(Base):
     __tablename__ = "events"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(500), nullable=False)
     event_type = Column(String(100))
     start_date = Column(Date, nullable=False)
@@ -33,7 +36,7 @@ class Event(Base):
     latitude = Column(Numeric(10, 7))
     longitude = Column(Numeric(10, 7))
     radius_impact_km = Column(Numeric(6, 2), default=Decimal("10.0"))
-    metadata_ = Column("metadata", JSONB, default=dict)
+    metadata_ = Column("metadata", JSON, default=dict)
 
 
 class MarketSignal(Base):
@@ -43,7 +46,7 @@ class MarketSignal(Base):
     signal_type = Column(String(100))
     market = Column(String(200))
     value = Column(Numeric(12, 4))
-    metadata_ = Column("metadata", JSONB, default=dict)
+    metadata_ = Column("metadata", JSON, default=dict)
 
 
 class ModelMetric(Base):
@@ -53,24 +56,24 @@ class ModelMetric(Base):
     product = Column(String(50), default="feasibility")
     metric_name = Column(String(200))
     metric_value = Column(Numeric(12, 6))
-    property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"))
-    metadata_ = Column("metadata", JSONB, default=dict)
+    property_id = Column(Uuid(as_uuid=True), ForeignKey("properties.id"))
+    metadata_ = Column("metadata", JSON, default=dict)
 
 
 class FeatureFlag(Base):
     __tablename__ = "feature_flags"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     flag_name = Column(String(200), unique=True, nullable=False)
     enabled = Column(Boolean, default=False)
     description = Column(Text)
     toggled_at = Column(DateTime(timezone=True), server_default=func.now())
-    metadata_ = Column("metadata", JSONB, default=dict)
+    metadata_ = Column("metadata", JSON, default=dict)
 
 
 class FeasibilityAnalysis(Base):
     __tablename__ = "feasibility_analyses"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    property_id = Column(Uuid(as_uuid=True), ForeignKey("properties.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     created_by = Column(String(200))
     status = Column(String(20), default="pending")
@@ -91,7 +94,7 @@ class FeasibilityAnalysis(Base):
     recommendation_reasoning = Column(Text)
     report_content = Column(Text)
     report_pdf_path = Column(String(500))
-    metadata_ = Column("metadata", JSONB, default=dict)
+    metadata_ = Column("metadata", JSON, default=dict)
 
     property = relationship("Property", back_populates="feasibility_analyses")
     comp_analyses = relationship("CompAnalysis", back_populates="feasibility", cascade="all, delete-orphan")
@@ -107,8 +110,8 @@ class FeasibilityAnalysis(Base):
 
 class CompAnalysis(Base):
     __tablename__ = "comp_analyses"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     comp_listing_id = Column(String(200))
     comp_name = Column(String(500))
     latitude = Column(Numeric(10, 7))
@@ -121,17 +124,17 @@ class CompAnalysis(Base):
     occupancy_rate = Column(Numeric(5, 2))
     avg_review_score = Column(Numeric(3, 1))
     similarity_score = Column(Numeric(4, 3))
-    monthly_revenue = Column(JSONB)
-    monthly_occupancy = Column(JSONB)
-    monthly_adr = Column(JSONB)
+    monthly_revenue = Column(JSON)
+    monthly_occupancy = Column(JSON)
+    monthly_adr = Column(JSON)
     data_source = Column(String(50), default="mock")
     feasibility = relationship("FeasibilityAnalysis", back_populates="comp_analyses")
 
 
 class RegulationAssessment(Base):
     __tablename__ = "regulation_assessments"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     municipality = Column(String(300))
     str_allowed = Column(Boolean)
     permit_required = Column(Boolean)
@@ -144,8 +147,8 @@ class RegulationAssessment(Base):
 
 class NeighborhoodScore(Base):
     __tablename__ = "neighborhood_scores"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     walk_score = Column(Integer)
     transit_score = Column(Integer)
     bike_score = Column(Integer)
@@ -156,14 +159,14 @@ class NeighborhoodScore(Base):
     restaurants_within_1km = Column(Integer)
     grocery_within_1km = Column(Integer)
     neighborhood_score = Column(Numeric(4, 2))
-    best_for = Column(ARRAY(Text))
+    best_for = Column(JSON)
     feasibility = relationship("FeasibilityAnalysis", back_populates="neighborhood_scores")
 
 
 class FinancialProjection(Base):
     __tablename__ = "financial_projections"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     projection_type = Column(String(50))
     year1_gross_revenue = Column(Numeric(12, 2))
     year2_gross_revenue = Column(Numeric(12, 2))
@@ -172,8 +175,8 @@ class FinancialProjection(Base):
     cap_rate = Column(Numeric(5, 3))
     cash_on_cash_return = Column(Numeric(5, 3))
     break_even_occupancy = Column(Numeric(5, 2))
-    monthly_projections = Column(JSONB)
-    annual_expenses = Column(JSONB)
+    monthly_projections = Column(JSON)
+    annual_expenses = Column(JSON)
     mc_revenue_p10 = Column(Numeric(12, 2))
     mc_revenue_p25 = Column(Numeric(12, 2))
     mc_revenue_p50 = Column(Numeric(12, 2))
@@ -184,11 +187,11 @@ class FinancialProjection(Base):
 
 class FeasibilityStressTest(Base):
     __tablename__ = "feasibility_stress_tests"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     scenario_name = Column(String(200), nullable=False)
     scenario_type = Column(String(50))
-    parameters = Column(JSONB, nullable=False)
+    parameters = Column(JSON, nullable=False)
     revenue_impact_pct = Column(Numeric(8, 4))
     still_profitable = Column(Boolean)
     adaptation_strategy = Column(Text)
@@ -197,18 +200,18 @@ class FeasibilityStressTest(Base):
 
 class SupplyPipeline(Base):
     __tablename__ = "supply_pipeline"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     new_listings_last_12mo = Column(Integer)
     supply_growth_pct_12mo = Column(Numeric(5, 2))
-    source_data = Column(JSONB)
+    source_data = Column(JSON)
     feasibility = relationship("FeasibilityAnalysis", back_populates="supply_pipeline")
 
 
 class PortfolioFit(Base):
     __tablename__ = "portfolio_fit"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     existing_property_count = Column(Integer)
     overall_portfolio_fit_score = Column(Numeric(4, 2))
     recommendation = Column(Text)
@@ -217,8 +220,8 @@ class PortfolioFit(Base):
 
 class RenovationAnalysis(Base):
     __tablename__ = "renovation_analyses"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     renovation_item = Column(String(200), nullable=False)
     estimated_cost = Column(Numeric(10, 2))
     roi_1yr_pct = Column(Numeric(8, 4))
@@ -229,8 +232,8 @@ class RenovationAnalysis(Base):
 
 class ExitStrategy(Base):
     __tablename__ = "exit_strategies"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    feasibility_id = Column(UUID(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feasibility_id = Column(Uuid(as_uuid=True), ForeignKey("feasibility_analyses.id"), nullable=False)
     strategy_type = Column(String(50), nullable=False)
     estimated_monthly_income = Column(Numeric(10, 2))
     estimated_annual_return = Column(Numeric(5, 3))
@@ -240,9 +243,9 @@ class ExitStrategy(Base):
 
 class FeasibilityKnowledge(Base):
     __tablename__ = "feasibility_knowledge"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_type = Column(String(50))
     source_name = Column(String(500))
     chunk_text = Column(Text, nullable=False)
-    topic_tags = Column(ARRAY(Text))
+    topic_tags = Column(JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -71,13 +71,35 @@ _AU_CBDS = [
 ]
 
 
+def _strip_unit_prefix(address: str) -> str:
+    """
+    Strip apartment/unit number prefixes that confuse geocoders.
+    e.g. '1302/58 Jeffcott Street' -> '58 Jeffcott Street'
+         'Unit 4, 12 Main Street' -> '12 Main Street'
+         'Apt 2B/45 King St' -> '45 King St'
+    """
+    import re
+    # Pattern: digits/digits at start (e.g. "1302/58" -> "58")
+    address = re.sub(r'^\d+\s*/\s*', '', address.strip())
+    # Pattern: "Unit X, " or "Apt X, " prefix
+    address = re.sub(r'^(?:unit|apt|apartment|flat|level|suite|shop)\s+\S+[,\s]+', '', address, flags=re.IGNORECASE)
+    return address.strip()
+
+
 async def geocode_address(address: str) -> Optional[GeocodedAddress]:
-    """Geocode address — Google first, Nominatim fallback."""
+    """
+    Geocode address — Google first, Nominatim fallback.
+    Strips unit/apartment prefixes before geocoding.
+    """
+    clean_address = _strip_unit_prefix(address)
+    if clean_address != address:
+        logger.info("geocode.stripped_unit", original=address, clean=clean_address)
+
     if settings.google_geocoding_api_key:
-        result = await _geocode_google(address)
+        result = await _geocode_google(clean_address)
         if result:
             return result
-    return await _geocode_nominatim(address)
+    return await _geocode_nominatim(clean_address)
 
 
 async def _geocode_google(address: str) -> Optional[GeocodedAddress]:

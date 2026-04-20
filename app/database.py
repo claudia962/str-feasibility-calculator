@@ -1,4 +1,8 @@
-"""Async SQLAlchemy engine, session factory, and dependency."""
+"""
+Async SQLAlchemy engine and session factory.
+Defaults to SQLite (aiosqlite) for local dev if DATABASE_URL not set.
+PostgreSQL (asyncpg) used in production via DATABASE_URL env var.
+"""
 from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -6,8 +10,24 @@ from app.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.database_url, pool_pre_ping=True, echo=settings.debug)
-AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+# SQLite requires check_same_thread=False; asyncpg doesn't need it
+_connect_args = {}
+if settings.database_url.startswith("sqlite"):
+    _connect_args = {"check_same_thread": False}
+
+engine = create_async_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    echo=settings.debug,
+    connect_args=_connect_args,
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
 
 
 class Base(DeclarativeBase):
@@ -22,6 +42,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+async def init_db() -> None:
+    """Create all tables from ORM metadata (used for local dev with SQLite)."""
+    from app.models import database_models  # noqa: F401 — ensure models are registered
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 async def close_db() -> None:

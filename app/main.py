@@ -1,13 +1,14 @@
-"""FastAPI application entry point."""
+"""FastAPI application — STR Feasibility Calculator."""
 from contextlib import asynccontextmanager
 from typing import Any
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import analyze, comps, exit, financials, portfolio, properties, regulations, renovations, reports, scenarios
+from app.api.routes import (analyze, comps, exit, financials, portfolio,
+                             properties, regulations, renovations, reports, scenarios)
 from app.config import get_settings
-from app.database import close_db, engine
+from app.database import close_db, engine, init_db
 
 structlog.configure(
     processors=[
@@ -24,14 +25,13 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[type-arg]
-    logger.info("app.startup", environment=settings.environment)
-    # Verify DB connection
+    logger.info("app.startup", environment=settings.environment, db=settings.database_url[:40])
+    # Auto-create tables (SQLite dev OR first-run postgres)
     try:
-        async with engine.connect() as conn:
-            await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
-        logger.info("db.connected")
+        await init_db()
+        logger.info("db.tables_ready")
     except Exception as exc:
-        logger.warning("db.connection_failed", error=str(exc))
+        logger.warning("db.init_failed", error=str(exc))
     yield
     await close_db()
     logger.info("app.shutdown")
@@ -47,7 +47,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins + ["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,7 +56,8 @@ app.add_middleware(
 
 @app.get("/health", tags=["system"])
 async def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "str-feasibility", "version": "1.0.0"}
+    return {"status": "ok", "service": "str-feasibility", "version": "1.0.0",
+            "environment": settings.environment}
 
 
 app.include_router(analyze.router)
