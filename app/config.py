@@ -39,12 +39,16 @@ class Settings(BaseSettings):
     comp_min_count: int = 5
     mc_simulations: int = 2000
 
-    # CORS
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "https://str-feasibility-calculator.vercel.app",
-        "https://frontend-qbxwjzzcm-live-luxe.vercel.app",
-    ]
+    # CORS — accepts JSON list string or comma-separated string from env
+    cors_origins: str = "http://localhost:3000,https://str-feasibility-calculator.vercel.app,https://frontend-qbxwjzzcm-live-luxe.vercel.app"
+
+    def get_cors_origins(self) -> list[str]:
+        """Parse CORS_ORIGINS as either JSON list or comma-separated string."""
+        import json
+        try:
+            return json.loads(self.cors_origins)
+        except (json.JSONDecodeError, TypeError):
+            return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # App
     debug: bool = False
