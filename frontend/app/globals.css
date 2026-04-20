@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #0F172A;
+  --gold: #AF7225;
+}
+
+body { -webkit-font-smoothing: antialiased; }
+
+.tab-active { border-bottom: 2px solid #AF7225; color: #0F172A; font-weight: 600; }
+.tab-inactive { border-bottom: 2px solid transparent; color: #64748b; }
+.tab-inactive:hover { color: #0F172A; }
