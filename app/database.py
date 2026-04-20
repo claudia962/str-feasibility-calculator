@@ -9,14 +9,15 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
 
 settings = get_settings()
+_db_url = settings.get_database_url()
 
 # SQLite requires check_same_thread=False; asyncpg doesn't need it
 _connect_args = {}
-if settings.database_url.startswith("sqlite"):
+if _db_url.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}
 
 engine = create_async_engine(
-    settings.database_url,
+    _db_url,
     pool_pre_ping=True,
     echo=settings.debug,
     connect_args=_connect_args,

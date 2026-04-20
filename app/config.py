@@ -7,8 +7,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
-    # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/str_feasibility"
+    # Database — resolved in priority order:
+    # 1. DATABASE_URL env var (explicit)
+    # 2. Constructed from SUPABASE_URL + SUPABASE_DB_PASSWORD
+    # 3. SQLite fallback for local dev
+    database_url: str = "sqlite+aiosqlite:///./str_feasibility_dev.db"
+
+    # Supabase
+    supabase_url: Optional[str] = None
+    supabase_service_role_key: Optional[str] = None
+    supabase_anon_key: Optional[str] = None
+    supabase_access_token: Optional[str] = None
+    supabase_db_password: Optional[str] = None  # DB password from Supabase dashboard
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -30,11 +40,43 @@ class Settings(BaseSettings):
     mc_simulations: int = 2000
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "https://str-feasibility-calculator.vercel.app",
+        "https://frontend-qbxwjzzcm-live-luxe.vercel.app",
+    ]
 
     # App
     debug: bool = False
     environment: str = "production"
+
+    def get_database_url(self) -> str:
+        """
+        Resolve database URL in priority order:
+        1. Explicit DATABASE_URL (if not SQLite default and not empty)
+        2. Supabase URL + DB password → asyncpg connection string
+        3. SQLite fallback
+        """
+        # If DATABASE_URL is explicitly set to something non-SQLite, use it
+        if self.database_url and "sqlite" not in self.database_url:
+            url = self.database_url
+            if url.startswith("postgresql://"):
+                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+            return url
+
+        # Construct from Supabase URL + password
+        if self.supabase_url and self.supabase_db_password:
+            # Extract project ref from URL: https://[ref].supabase.co
+            ref = self.supabase_url.replace("https://", "").split(".")[0]
+            return (
+                f"postgresql+asyncpg://postgres:{self.supabase_db_password}"
+                f"@db.{ref}.supabase.co:5432/postgres"
+            )
+
+        # SQLite fallback
+        return self.database_url
 
 
 @lru_cache()
