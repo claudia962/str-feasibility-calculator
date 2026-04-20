@@ -1,0 +1,13 @@
+# Exclude large data files from Vercel bundle (54MB CSV exceeds function limit)
+data/melbourne_listings.csv
+data/*.csv
+data/*.gz
+
+# Exclude test files and dev artifacts
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite
+reports/
