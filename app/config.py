@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # 1. DATABASE_URL env var (explicit)
     # 2. Constructed from SUPABASE_URL + SUPABASE_DB_PASSWORD
     # 3. SQLite fallback for local dev
-    database_url: str = "sqlite+aiosqlite:///./str_feasibility_dev.db"
+    database_url: str = ""  # Resolved via get_database_url()
 
     # Supabase
     supabase_url: Optional[str] = None
@@ -79,8 +79,11 @@ class Settings(BaseSettings):
                 f"@db.{ref}.supabase.co:5432/postgres"
             )
 
-        # SQLite fallback
-        return self.database_url
+        # SQLite fallback — use /tmp on serverless (read-only filesystem)
+        import os, tempfile
+        if os.environ.get("VERCEL") or not os.access(".", os.W_OK):
+            return f"sqlite+aiosqlite:///{os.path.join(tempfile.gettempdir(), 'str_feasibility.db')}"
+        return "sqlite+aiosqlite:///./str_feasibility_dev.db"
 
 
 @lru_cache()

@@ -1,7 +1,7 @@
 """
 Async SQLAlchemy engine and session factory.
-Defaults to SQLite (aiosqlite) for local dev if DATABASE_URL not set.
-PostgreSQL (asyncpg) used in production via DATABASE_URL env var.
+SQLite (aiosqlite) for serverless/dev, PostgreSQL (asyncpg) for production.
+Auto-creates tables on first request if SQLite.
 """
 from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -11,7 +11,6 @@ from app.config import get_settings
 settings = get_settings()
 _db_url = settings.get_database_url()
 
-# SQLite requires check_same_thread=False; asyncpg doesn't need it
 _connect_args = {}
 if _db_url.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}
@@ -24,10 +23,7 @@ engine = create_async_engine(
 )
 
 AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
+    bind=engine, class_=AsyncSession, expire_on_commit=False, autoflush=False,
 )
 
 
@@ -35,7 +31,22 @@ class Base(DeclarativeBase):
     pass
 
 
+_db_initialized = False
+
+
+async def _ensure_tables() -> None:
+    """Create tables if not yet initialized (idempotent)."""
+    global _db_initialized
+    if _db_initialized:
+        return
+    from app.models import database_models  # noqa: F401
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    _db_initialized = True
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    await _ensure_tables()
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -46,10 +57,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Create all tables from ORM metadata (used for local dev with SQLite)."""
-    from app.models import database_models  # noqa: F401 — ensure models are registered
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Explicit table creation (for startup hooks)."""
+    await _ensure_tables()
 
 
 async def close_db() -> None:
