@@ -15,7 +15,14 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
+import tempfile as _tmpmod
+
+# Use /tmp on serverless (read-only filesystem), local dir otherwise
+_local_reports = Path(__file__).parent.parent.parent / "reports"
+if os.environ.get("VERCEL") or not os.access(str(_local_reports.parent), os.W_OK):
+    REPORTS_DIR = Path(_tmpmod.gettempdir()) / "feasibility_reports"
+else:
+    REPORTS_DIR = _local_reports
 REPORTS_DIR.mkdir(exist_ok=True)
 
 
