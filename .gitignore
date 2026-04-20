@@ -17,3 +17,5 @@ node_modules/
 .vercel
 data/melbourne_listings.csv
 data/melbourne_listings.csv.gz
+scripts/*.mjs
+check-deploy.mjs
