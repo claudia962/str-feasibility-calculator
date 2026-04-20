@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -39,13 +39,16 @@ router = APIRouter(prefix="/api/feasibility", tags=["feasibility"])
 logger = structlog.get_logger(__name__)
 
 
-@router.post("/analyze", response_model=FeasibilityAnalysisResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/analyze", response_model=FeasibilityStatusResponse, status_code=status.HTTP_200_OK)
 async def create_analysis(
     request: FeasibilityAnalysisRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_session),
-) -> FeasibilityAnalysisResponse:
-    """Start a new feasibility analysis. Returns analysis_id immediately."""
+) -> FeasibilityStatusResponse:
+    """
+    Run a full feasibility analysis synchronously.
+    Returns the complete result (all 12 steps) in a single response.
+    Typical response time: 5-15 seconds. Vercel Pro timeout: 60s.
+    """
     analysis = FeasibilityAnalysis(
         address=request.address,
         property_type=request.property_type,
@@ -64,12 +67,27 @@ async def create_analysis(
     analysis_id = analysis.id
     await db.commit()
     logger.info("analysis.created", analysis_id=str(analysis_id), address=request.address)
-    background_tasks.add_task(_run_pipeline, analysis_id, request)
-    return FeasibilityAnalysisResponse(
-        analysis_id=analysis_id,
-        status=AnalysisStatus.PENDING,
-        message=f"Analysis started. Poll GET /api/feasibility/{analysis_id}",
+
+    # Run pipeline synchronously (no background tasks — works on serverless)
+    await _run_pipeline(analysis_id, request)
+
+    # Fetch and return the complete result
+    result = await db.execute(
+        select(FeasibilityAnalysis)
+        .options(
+            selectinload(FeasibilityAnalysis.neighborhood_scores),
+            selectinload(FeasibilityAnalysis.comp_analyses),
+            selectinload(FeasibilityAnalysis.financial_projections),
+            selectinload(FeasibilityAnalysis.stress_tests),
+        )
+        .where(FeasibilityAnalysis.id == analysis_id)
     )
+    completed = result.scalar_one_or_none()
+    if completed:
+        return _build_response(completed)
+
+    # Fallback if something went wrong
+    return _build_response(analysis)
 
 
 @router.get("/", response_model=list[FeasibilityStatusResponse])
